@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 372 100" width="372" height="100">
+  <!-- TUM Data Innovation Lab wordmark (the lab has no graphic logo; its own material uses this name in plain sans) -->
+  <g font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" fill="#3070b3">
+    <text x="0" y="40" font-size="40" font-weight="700" letter-spacing="1">TUM</text>
+    <text x="0" y="88" font-size="40" font-weight="400">Data Innovation Lab</text>
+  </g>
+</svg>

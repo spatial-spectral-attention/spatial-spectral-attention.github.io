@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spatial-Spectral Coupling as Attention</title>
+  <meta name="description" content="Spatial-spectral coupling in functional-map shape matching is scaled dot-product attention. FlashAttention and our Geo-FlashAttention scale dense correspondence to high-resolution surfaces such as the human cortex.">
+  <meta property="og:title" content="Spatial-Spectral Coupling as Attention">
+  <meta property="og:description" content="Scaling shape correspondence to high-resolution surfaces with FlashAttention and Geo-FlashAttention.">
+  <meta property="og:image" content="https://spatial-spectral-attention.github.io/static/video/poster.jpg">
+  <script>
+    // Theme before first paint: stored choice, else the system preference.
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('theme'); } catch (e) {}
+      if (!t) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', t);
+      document.documentElement.classList.add('js');
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+  <link rel="stylesheet" href="static/css/site.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="page-shell">
+    <header class="masthead">
+      <a class="wordmark" href="#main" aria-label="Back to top">Spatial-Spectral<span>Attention</span></a>
+      <nav aria-label="Page navigation">
+        <a href="#abstract">Abstract</a>
+        <a href="#method">Method</a>
+        <a href="#results">Results</a>
+        <a href="#citation">Citation</a>
+        <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch color theme">
+          <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M20 15.3A8.5 8.5 0 0 1 8.7 4a8.5 8.5 0 1 0 11.3 11.3Z"/></svg>
+          <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="3.7"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+        </button>
+      </nav>
+    </header>
+
+    <main id="main">
+      
+      <section class="hero" aria-labelledby="paper-title">
+        
+        <div class="publication-line"><span>Preprint · 2026</span></div>
+        <h1 id="paper-title">
+          <span class="title-main">Spatial-Spectral Coupling as <span class="redact" id="redact">Attention</span></span>
+          <span class="title-sub">Scaling Shape Correspondence to High-Resolution Surfaces</span>
+        </h1>
+
+        <div class="paper-details"><div class="authors"><span>Bence Demeter<sup>1*</sup></span><span>Kilian Ehrenreich<sup>1*</sup></span><span>Amelie Kleber<sup>1*</sup></span><span>Ioana Oprisiu<sup>1*</sup></span><span>Philipp Spohn<sup>1*</sup></span><span>Christian Wachinger<sup>1,2</sup></span><span>Fabian Bongratz<sup>1,2</sup></span><span>Lennart Bastian<sup>3†</sup></span></div><p class="author-note">* Equal contribution, ordered alphabetically. † Correspondence: l.bastian@imperial.ac.uk</p><p class="affiliations">
+            <span><sup>1</sup> Technical University of Munich</span>
+            <span><sup>2</sup> Munich Center for Machine Learning</span>
+            <span><sup>3</sup> Imperial College London</span>
+          </p>
+          <div class="resources" aria-label="Publication resources">
+            <a class="resource-button" href="paper.pdf">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Zm0 0v5h5M9 13h6m-6 4h6"/></svg>
+              Paper PDF</a>
+            <button class="resource-button" type="button" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 5C9 3 5 3 2 4v15c3-1 7-1 10 1 3-2 7-2 10-1V4c-3-1-7-1-10 1Zm0 0v15"/></svg>
+              arXiv <span class="button-status">soon</span></button>
+            <button class="resource-button" type="button" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m8 7-5 5 5 5m8-10 5 5-5 5M14 4l-4 16"/></svg>
+              Code <span class="button-status">coming soon</span></button>
+          </div>
+        </div>
+
+        <figure class="teaser">
+<div class="video-frame"><video controls muted loop playsinline preload="metadata" poster="static/video/poster.jpg" width="1920" height="1080"><source src="static/video/teaser-1080.mp4" type="video/mp4"><a href="static/video/teaser-1080.mp4">Download the teaser video</a>.</video></div>          <figcaption id="teaser-caption">
+            <span class="caption-title">Dense correspondence between two full-resolution cortical surfaces.</span>
+            Our predicted point-to-point map between two held-out Mindboggle-101 subjects,
+            trained end to end at native resolution. Arcs show sampled correspondences; DKT labels flow from source to target through the map.
+          </figcaption>
+        </figure>
+      </section>
+
+      
+      <section class="introduction" id="abstract" aria-labelledby="abstract-title">
+        <h2 id="abstract-title">Abstract</h2>
+        <div class="prose">
+          <p>
+            Establishing dense correspondence between high-resolution 3D shapes remains challenging due to the spatial-spectral coupling at the core of many
+            functional-map methods, which grows quadratically with mesh resolution. We observe that this coupling is equivalent to a scaled dot-product attention
+            formulation, with learned descriptors serving as queries and keys and spectral basis functions as values. This connection makes efficient attention
+            implementations directly applicable to shape matching and an effective mechanism for scaling spatial-spectral coupling. We show that optimized quadratic
+            attention implementations can scale modern deep functional map pipelines to large mesh sizes, improving both runtime and memory consumption, while
+            sub-quadratic methods introduce errors, particularly for non-isometric shape pairs, where an exact coupling proves most necessary. These insights motivate
+            <em>Geo-FlashAttention</em>, which restricts the exact softmax to geometry-selected surface patches and achieves near-linear empirical scaling while
+            preserving correspondence accuracy of exact implementations. Across six standard benchmarks and three functional-map pipelines, rigorous analysis shows
+            that efficient couplings preserve correspondence accuracy. At 60k vertices, these insights reduce peak training memory from 106.08 to 5.67&nbsp;GiB,
+            with Geo-FlashAttention being 1.5× faster per training step than FlashAttention. This enables end-to-end learning for correspondence problems on large
+            meshes such as cortical surfaces, where high resolution is required to preserve disease-relevant intricacies of the surface geometry.
+          </p>
+        </div>
+      </section>
+
+      
+      <section class="section problem" aria-labelledby="problem-title">
+        <div class="split">
+          <div class="split-text">
+            <p class="eyebrow">The bottleneck</p>
+            <h2 id="problem-title">The coupling grows with <em>n</em><sub>M</sub>&nbsp;·&nbsp;<em>n</em><sub>N</sub></h2>
+            <div class="prose">
+              <p>
+                Spectral matching methods rely on a point-to-point map <span class="math">\Pi_{NM}</span>. Comparing every vertex on one shape with every vertex
+                on the other needs <span class="math">\mathcal{O}(n_M \cdot n_N)</span> memory. For two cortical surfaces with ≈160k vertices each, the dense matrix has over 25 billion entries, creating a substantial training-memory bottleneck.
+              </p>
+            </div>
+          </div>
+          <a class="figure-card zoomable" href="static/images/teaser-problem.svg" target="_blank" rel="noopener" aria-label="Open figure: the scalability challenge">
+            <img src="static/images/teaser-problem.svg" alt="Two cortical meshes with about 160k vertices each and the dense point-to-point map between them." loading="lazy">
+          </a>
+        </div>
+      </section>
+
+      
+      <section class="section" id="method" aria-labelledby="method-title">
+        <div class="section-heading">
+          <p class="eyebrow">How it works</p>
+          <h2 id="method-title">Spatial-spectral coupling is attention</h2>
+          <p>Coupled functional-map methods only consume the product <span class="math">\Pi_{NM}\Phi_M</span>. Written out, it is scaled dot-product attention, so efficient attention kernels apply directly.</p>
+        </div>
+
+        <div class="equation-card">
+          <div class="equation-row">
+            <div class="equation" data-display="\Pi_{NM}\,\Phi_M \;=\; \operatorname{Softmax}\!\left(\frac{\htmlClass{eq-q}{F_N}\,\htmlClass{eq-k}{F_M^{\top}}}{\tau}\right)\htmlClass{eq-v}{\Phi_M}"></div>
+            <div class="equation" data-display="=\; \operatorname{SDPA}_{1/\tau}(\htmlClass{eq-q}{Q},\htmlClass{eq-k}{K},\htmlClass{eq-v}{V})"></div>
+          </div>
+          <div class="qkv">
+            <div class="qkv-item q"><span class="qkv-tag">Q</span><div><span class="math">Q = F_N</span><p>learned descriptors of the target shape</p></div></div>
+            <div class="qkv-item k"><span class="qkv-tag">K</span><div><span class="math">K = F_M</span><p>learned descriptors of the source shape</p></div></div>
+            <div class="qkv-item v"><span class="qkv-tag">V</span><div><span class="math">V = \Phi_M</span><p>Laplace-Beltrami eigenbasis, transported through the map</p></div></div>
+          </div>
+          <div class="modes" aria-label="Laplace-Beltrami eigenmodes on the cortex">
+            <figure><img src="static/images/modes/mode-1.webp" alt="" loading="lazy"><figcaption><span class="math">\phi_1</span></figcaption></figure>
+            <figure><img src="static/images/modes/mode-2.webp" alt="" loading="lazy"><figcaption><span class="math">\phi_2</span></figcaption></figure>
+            <figure><img src="static/images/modes/mode-3.webp" alt="" loading="lazy"><figcaption><span class="math">\phi_3</span></figcaption></figure>
+            <figure><img src="static/images/modes/mode-10.webp" alt="" loading="lazy"><figcaption><span class="math">\phi_{10}</span></figcaption></figure>
+            <figure><img src="static/images/modes/mode-50.webp" alt="" loading="lazy"><figcaption><span class="math">\phi_{50}</span></figcaption></figure>
+            <figure><img src="static/images/modes/mode-200.webp" alt="" loading="lazy"><figcaption><span class="math">\phi_{200}</span></figcaption></figure>
+          </div>
+          <p class="modes-caption">The values: columns of <span class="math">\Phi_M</span>, eigenfunctions of the Laplace-Beltrami operator on the source cortex.</p>
+        </div>
+      </section>
+
+      
+      <section class="section" id="results" aria-labelledby="results-title">
+        <div class="section-heading">
+          <p class="eyebrow">Results</p>
+          <h2 id="results-title">Runtime and memory</h2>
+          <p>One training step as mesh resolution grows, on a single H200 NVL (140&nbsp;GB). Only the evaluation of <span class="math">\Pi\Phi</span> changes.</p>
+        </div>
+
+        <a class="figure-card wide zoomable" href="static/images/attention-scaling.svg" target="_blank" rel="noopener" aria-label="Open figure: scaling">
+          <img src="static/images/attention-scaling.svg" alt="Runtime, memory, and accuracy relative to dense coupling, as mesh resolution grows from 5k to 58k vertices." loading="lazy">
+        </a>
+
+        <div class="table-block">
+          <div class="table-scroll">
+            <table>
+              <caption><span class="table-number">Table 1</span>One ULRSSM training step on TOPKIDS</caption>
+              <thead>
+                <tr><th rowspan="2">Coupling</th><th colspan="2" class="group">≈12k vertices</th><th colspan="2" class="group metric-start">≈60k vertices</th></tr>
+                <tr><th>Time (ms)</th><th>Peak mem. (GiB)</th><th class="metric-start">Time (ms)</th><th>Peak mem. (GiB)</th></tr>
+              </thead>
+              <tbody>
+                <tr><th>Dense (fp32)</th><td>66.0</td><td>5.22</td><td class="metric-start">710.6</td><td class="bad">106.08</td></tr>
+                <tr><th>FlashAttention (bf16)</th><td>46.4</td><td>1.23</td><td class="metric-start">207.2</td><td>5.67</td></tr>
+                <tr><th>Linear attention (ELU) <span class="ours-label">approximate</span></th><td><strong>43.5</strong></td><td>1.23</td><td class="metric-start"><strong>108.4</strong></td><td>5.67</td></tr>
+                <tr class="ours"><th>Geo-FlashAttention <span class="ours-label">ours</span></th><td>52.3</td><td>1.23</td><td class="metric-start">136.2</td><td>5.67</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="table-note">Lower time and memory are better. Mean over five repeats on an H200 NVL. Measurements cover one training iteration. Linear attention is fastest but approximates the coupling and loses accuracy (panel c above); FlashAttention and Geo-FlashAttention achieve comparable observed correspondence accuracy across the tested benchmarks. Geo-FlashAttention approximates full coupling through selected support.</p>
+        </div>
+      </section>
+
+      
+      <section class="section" id="pipeline" aria-labelledby="pipeline-title">
+        <div class="section-heading">
+          <h2 id="pipeline-title">Geo-FlashAttention</h2>
+          <p>We partition each surface into geodesic patches, score source patches using descriptors, and compute exact softmax within selected support. Restricting that support approximates the full coupling.</p>
+        </div>
+        <a class="figure-card wide zoomable" href="static/images/geoflash-pipeline.svg" target="_blank" rel="noopener" aria-label="Open figure: Geo-FlashAttention pipeline">
+          <img src="static/images/geoflash-pipeline.svg" alt="Geo-FlashAttention pipeline: partition both shapes into patches, pool source keys, score source patches, keep the top R per target patch, and run a fused block-sparse kernel." loading="lazy">
+        </a>
+      </section>
+
+      <section class="citation" id="citation" aria-labelledby="citation-title">
+        <div class="citation-heading">
+          <h2 id="citation-title">Citation</h2>
+          <button class="copy-button" id="copy-bibtex" type="button">Copy BibTeX</button>
+        </div>
+        
+        <pre id="bibtex"><code>@misc{demeter2026spatialspectral,
+  title   = {Spatial-Spectral Coupling as Attention:
+             Scaling Shape Correspondence to High-Resolution Surfaces},
+  author  = {Demeter, Bence and Ehrenreich, Kilian and Kleber, Amelie and
+             Oprisiu, Ioana and Spohn, Philipp and Wachinger, Christian and
+             Bongratz, Fabian and Bastian, Lennart},
+  note    = {Preprint},
+  year    = {2026}
+}</code></pre>
+        <p class="copy-status" id="copy-status" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <footer>
+      <div class="logos">
+        <img src="static/images/logos/tum.svg" alt="Technical University of Munich" class="logo-tum">
+        <img src="static/images/logos/imperial.svg" alt="Imperial College London" class="logo-imperial">
+        <img src="static/images/logos/dil.svg" alt="TUM Data Innovation Lab" class="logo-dil">
+      </div>
+      <p>A TUM Data Innovation Lab project. Template inspired by <a href="https://wngtn.github.io/TopoOR/" target="_blank" rel="noopener noreferrer">TopoOR</a>.</p>
+    </footer>
+  </div>
+
+  <dialog id="figure-dialog" aria-label="Figure">
+    <button class="dialog-close" type="button" aria-label="Close">×</button>
+    <img alt="">
+  </dialog>
+
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+  <script defer src="static/js/site.js"></script>
+</body>
+</html>
