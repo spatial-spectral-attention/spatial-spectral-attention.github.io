@@ -32,7 +32,7 @@
       <nav aria-label="Page navigation">
         <a href="#abstract">Abstract</a>
         <a href="#method">Method</a>
-        <a href="#results">Results</a>
+        <a href="#results">Geo-FlashAttention</a>
         <a href="#citation">Citation</a>
         <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch color theme">
           <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M20 15.3A8.5 8.5 0 0 1 8.7 4a8.5 8.5 0 1 0 11.3 11.3Z"/></svg>
@@ -51,7 +51,47 @@
           <span class="title-sub">Scaling Shape Correspondence to High-Resolution Surfaces</span>
         </h1>
 
-        <div class="paper-details"><div class="authors"><span>Bence Demeter<sup>1*</sup></span><span>Kilian Ehrenreich<sup>1*</sup></span><span>Amelie Kleber<sup>1*</sup></span><span>Ioana Oprisiu<sup>1*</sup></span><span>Philipp Spohn<sup>1*</sup></span><span>Christian Wachinger<sup>1,2</sup></span><span>Fabian Bongratz<sup>1,2</sup></span><span>Lennart Bastian<sup>3†</sup></span></div><p class="author-note">* Equal contribution, ordered alphabetically. † Correspondence: l.bastian@imperial.ac.uk</p><p class="affiliations">
+        <div class="paper-details">
+          <div class="authors">
+            <div class="author-row">
+              <div class="author">
+                <img class="author-portrait" src="static/images/people/demeter.webp" alt="" width="80" height="80">
+                <span>Bence Demeter<sup>1*</sup></span>
+              </div>
+              <div class="author">
+                <img class="author-portrait" src="static/images/people/ehrenreich.webp" alt="" width="80" height="80">
+                <span>Kilian Ehrenreich<sup>1*</sup></span>
+              </div>
+              <div class="author">
+                <img class="author-portrait" src="static/images/people/kleber.webp" alt="" width="80" height="80">
+                <span>Amelie Kleber<sup>1*</sup></span>
+              </div>
+              <div class="author">
+                <img class="author-portrait" src="static/images/people/oprisiu.webp" alt="" width="80" height="80">
+                <span>Ioana Oprisiu<sup>1*</sup></span>
+              </div>
+              <div class="author">
+                <img class="author-portrait" src="static/images/people/spohn.webp" alt="" width="80" height="80">
+                <span>Philipp Spohn<sup>1*</sup></span>
+              </div>
+            </div>
+            <div class="author-row">
+              <div class="author">
+                <img class="author-portrait" src="static/images/people/wachinger.webp" alt="" width="80" height="80">
+                <span>Christian Wachinger<sup>1,2</sup></span>
+              </div>
+              <div class="author">
+                <img class="author-portrait" src="static/images/people/bongratz.webp" alt="" width="80" height="80">
+                <span>Fabian Bongratz<sup>1,2</sup></span>
+              </div>
+              <div class="author">
+                <img class="author-portrait" src="static/images/people/bastian.webp" alt="" width="80" height="80">
+                <span>Lennart Bastian<sup>3†</sup></span>
+              </div>
+            </div>
+          </div>
+          <p class="author-note">* Equal contribution, ordered alphabetically. † Correspondence: l.bastian@imperial.ac.uk</p>
+          <p class="affiliations">
             <span><sup>1</sup> Technical University of Munich</span>
             <span><sup>2</sup> Munich Center for Machine Learning</span>
             <span><sup>3</sup> Imperial College London</span>
@@ -60,9 +100,9 @@
             <a class="resource-button" href="paper.pdf">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Zm0 0v5h5M9 13h6m-6 4h6"/></svg>
               Paper PDF</a>
-            <button class="resource-button" type="button" disabled>
+            <a class="resource-button" href="https://arxiv.org/abs/2611.13870">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 5C9 3 5 3 2 4v15c3-1 7-1 10 1 3-2 7-2 10-1V4c-3-1-7-1-10 1Zm0 0v15"/></svg>
-              arXiv <span class="button-status">soon</span></button>
+              arXiv</a>
             <button class="resource-button" type="button" disabled>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m8 7-5 5 5 5m8-10 5 5-5 5M14 4l-4 16"/></svg>
               Code <span class="button-status">coming soon</span></button>
@@ -70,7 +110,12 @@
         </div>
 
         <figure class="teaser">
-<div class="video-frame"><video controls muted loop playsinline preload="metadata" poster="static/video/poster.jpg" width="1920" height="1080"><source src="static/video/teaser-1080.mp4" type="video/mp4"><a href="static/video/teaser-1080.mp4">Download the teaser video</a>.</video></div>          <figcaption id="teaser-caption">
+          <div class="teaser-frame" id="teaser-frame" hidden>
+            <img src="static/video/poster.jpg" alt="" width="1920" height="1080">
+            <button class="teaser-start" id="teaser-start" type="button">Explore in 3D</button>
+            <span class="teaser-status" id="teaser-status" role="status"></span>
+          </div>
+          <figcaption id="teaser-caption">
             <span class="caption-title">Dense correspondence between two full-resolution cortical surfaces.</span>
             Our predicted point-to-point map between two held-out Mindboggle-101 subjects,
             trained end to end at native resolution. Arcs show sampled correspondences; DKT labels flow from source to target through the map.
@@ -103,10 +148,10 @@
         <div class="split">
           <div class="split-text">
             <p class="eyebrow">The bottleneck</p>
-            <h2 id="problem-title">The coupling grows with <em>n</em><sub>M</sub>&nbsp;·&nbsp;<em>n</em><sub>N</sub></h2>
+            <h2 id="problem-title">Dense point-to-point correspondence scales quadratically with mesh resolution</h2>
             <div class="prose">
               <p>
-                Spectral matching methods rely on a point-to-point map <span class="math">\Pi_{NM}</span>. Comparing every vertex on one shape with every vertex
+                Spectral matching methods often rely on a point-to-point map <span class="math">\Pi_{NM}</span>. Comparing every vertex on one shape with every vertex
                 on the other needs <span class="math">\mathcal{O}(n_M \cdot n_N)</span> memory. For two cortical surfaces with ≈160k vertices each, the dense matrix has over 25 billion entries, creating a substantial training-memory bottleneck.
               </p>
             </div>
@@ -122,7 +167,7 @@
         <div class="section-heading">
           <p class="eyebrow">How it works</p>
           <h2 id="method-title">Spatial-spectral coupling is attention</h2>
-          <p>Coupled functional-map methods only consume the product <span class="math">\Pi_{NM}\Phi_M</span>. Written out, it is scaled dot-product attention, so efficient attention kernels apply directly.</p>
+          <p>Coupled functional-map methods only consume the product <span class="math">\Pi_{NM}\Phi_M</span>. Written out, it is equivalent to scaled dot-product attention, so efficient attention kernels apply directly.</p>
         </div>
 
         <div class="equation-card">
@@ -148,46 +193,18 @@
       </section>
 
       
-      <section class="section" id="results" aria-labelledby="results-title">
-        <div class="section-heading">
-          <p class="eyebrow">Results</p>
-          <h2 id="results-title">Runtime and memory</h2>
-          <p>One training step as mesh resolution grows, on a single H200 NVL (140&nbsp;GB). Only the evaluation of <span class="math">\Pi\Phi</span> changes.</p>
+      <section class="section" id="results" aria-labelledby="pipeline-title">
+        <div class="section-heading" id="pipeline">
+          <h2 id="pipeline-title">Geo-FlashAttention: an efficient approximation</h2>
+          <p>We partition both surfaces into geodesic patches, score patch pairs, and compute exact softmax over the selected pairs. See the interacive example below.</p>
         </div>
-
-        <a class="figure-card wide zoomable" href="static/images/attention-scaling.svg" target="_blank" rel="noopener" aria-label="Open figure: scaling">
-          <img src="static/images/attention-scaling.svg" alt="Runtime, memory, and accuracy relative to dense coupling, as mesh resolution grows from 5k to 58k vertices." loading="lazy">
-        </a>
-
-        <div class="table-block">
-          <div class="table-scroll">
-            <table>
-              <caption><span class="table-number">Table 1</span>One ULRSSM training step on TOPKIDS</caption>
-              <thead>
-                <tr><th rowspan="2">Coupling</th><th colspan="2" class="group">≈12k vertices</th><th colspan="2" class="group metric-start">≈60k vertices</th></tr>
-                <tr><th>Time (ms)</th><th>Peak mem. (GiB)</th><th class="metric-start">Time (ms)</th><th>Peak mem. (GiB)</th></tr>
-              </thead>
-              <tbody>
-                <tr><th>Dense (fp32)</th><td>66.0</td><td>5.22</td><td class="metric-start">710.6</td><td class="bad">106.08</td></tr>
-                <tr><th>FlashAttention (bf16)</th><td>46.4</td><td>1.23</td><td class="metric-start">207.2</td><td>5.67</td></tr>
-                <tr><th>Linear attention (ELU) <span class="ours-label">approximate</span></th><td><strong>43.5</strong></td><td>1.23</td><td class="metric-start"><strong>108.4</strong></td><td>5.67</td></tr>
-                <tr class="ours"><th>Geo-FlashAttention <span class="ours-label">ours</span></th><td>52.3</td><td>1.23</td><td class="metric-start">136.2</td><td>5.67</td></tr>
-              </tbody>
-            </table>
+        <div class="geoflash-demo" id="geoflash-demo" hidden>
+          <div class="geoflash-loading">
+            <p id="geoflash-status" role="status">Loading 3D surfaces…</p>
+            <button class="resource-button" id="geoflash-retry" type="button" hidden>Try again</button>
           </div>
-          <p class="table-note">Lower time and memory are better. Mean over five repeats on an H200 NVL. Measurements cover one training iteration. Linear attention is fastest but approximates the coupling and loses accuracy (panel c above); FlashAttention and Geo-FlashAttention achieve comparable observed correspondence accuracy across the tested benchmarks. Geo-FlashAttention approximates full coupling through selected support.</p>
         </div>
-      </section>
-
-      
-      <section class="section" id="pipeline" aria-labelledby="pipeline-title">
-        <div class="section-heading">
-          <h2 id="pipeline-title">Geo-FlashAttention</h2>
-          <p>We partition each surface into geodesic patches, score source patches using descriptors, and compute exact softmax within selected support. Restricting that support approximates the full coupling.</p>
-        </div>
-        <a class="figure-card wide zoomable" href="static/images/geoflash-pipeline.svg" target="_blank" rel="noopener" aria-label="Open figure: Geo-FlashAttention pipeline">
-          <img src="static/images/geoflash-pipeline.svg" alt="Geo-FlashAttention pipeline: partition both shapes into patches, pool source keys, score source patches, keep the top R per target patch, and run a fused block-sparse kernel." loading="lazy">
-        </a>
+        <p class="geoflash-summary">At about <strong>60,000 vertices</strong> on TOPKIDS, Geo-FlashAttention cut training step time by <strong>34%</strong> relative to FlashAttention and peak training memory by <strong>95%</strong> relative to dense fp32 coupling. We also trained end to end on native Mindboggle-101 meshes with <strong>122,000–166,000 vertices per hemisphere</strong>. <a href="https://arxiv.org/abs/2611.13870">See the paper for benchmarks.</a></p>
       </section>
 
       <section class="citation" id="citation" aria-labelledby="citation-title">
@@ -202,8 +219,11 @@
   author  = {Demeter, Bence and Ehrenreich, Kilian and Kleber, Amelie and
              Oprisiu, Ioana and Spohn, Philipp and Wachinger, Christian and
              Bongratz, Fabian and Bastian, Lennart},
-  note    = {Preprint},
-  year    = {2026}
+  year    = {2026},
+  eprint  = {2611.13870},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CV},
+  url     = {https://arxiv.org/abs/2611.13870}
 }</code></pre>
         <p class="copy-status" id="copy-status" aria-live="polite"></p>
       </section>

@@ -28,78 +28,100 @@
   if (window.katex) renderMath();
   else window.addEventListener('load', renderMath);
 
-  /* ---------- teaser player ---------- */
-  var frame = $('#teaser-player');
-  var video = $('#teaser-video');
-  if (frame && video) {
-    // Smaller file on small screens.
-    if (window.innerWidth * (window.devicePixelRatio || 1) < 1400) {
-      video.querySelector('source').src = video.dataset.srcSd;
-      video.load();
+  /* ---------- interactive teaser ---------- */
+  var teaser = $('#teaser-frame');
+  var start = $('#teaser-start');
+  var teaserStatus = $('#teaser-status');
+  teaser.hidden = false;
+  start.addEventListener('click', function () {
+    var viewer = document.createElement('iframe');
+    viewer.title = 'Interactive cortical correspondence teaser';
+    viewer.setAttribute('aria-describedby', 'teaser-caption');
+    viewer.src = 'static/teaser/02-teaser/index.html';
+    viewer.className = 'teaser-viewer';
+    viewer.style.visibility = 'hidden';
+    start.disabled = true;
+    teaserStatus.textContent = 'Loading 3D surfaces…';
+
+    function finish(ok) {
+      clearTimeout(timeout);
+      window.removeEventListener('message', onViewerMessage);
+      if (ok) {
+        viewer.style.visibility = '';
+        teaser.classList.add('is-ready');
+        if (document.activeElement === start || document.activeElement === document.body) viewer.focus();
+        teaserStatus.textContent = '';
+      } else {
+        viewer.remove();
+        start.disabled = false;
+        teaserStatus.textContent = 'Could not load the interactive teaser.';
+      }
     }
-    var seek = $('#video-seek'), fill = $('#seek-fill'), time = $('#video-time');
-    var chapters = $$('.chapters button');
-    var dur = function () { return video.duration || 24.5; };
-    var fmt = function (t) { t = Math.max(0, Math.floor(t)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
 
-    var play = function () { var p = video.play(); if (p && p.catch) p.catch(function () {}); };
-    var togglePlay = function () { video.paused ? play() : video.pause(); };
-    video.addEventListener('play', function () { frame.classList.add('playing'); });
-    video.addEventListener('pause', function () { frame.classList.remove('playing'); });
-    video.addEventListener('click', togglePlay);
-    $('#video-start').addEventListener('click', play);
-    $('#video-toggle').addEventListener('click', togglePlay);
-
-    video.addEventListener('timeupdate', function () {
-      var t = video.currentTime;
-      fill.style.width = (100 * t / dur()) + '%';
-      time.textContent = fmt(t);
-      seek.setAttribute('aria-valuenow', t.toFixed(1));
-      chapters.forEach(function (b) {
-        b.classList.toggle('is-active', t >= +b.dataset.t && t < +b.dataset.end);
-      });
-    });
-
-    var scrubTo = function (e) {
-      var r = seek.getBoundingClientRect();
-      var x = Math.min(Math.max((e.clientX - r.left) / r.width, 0), 1);
-      video.currentTime = x * dur();
-    };
-    seek.addEventListener('pointerdown', function (e) {
-      seek.setPointerCapture(e.pointerId); scrubTo(e);
-      var move = function (ev) { scrubTo(ev); };
-      seek.addEventListener('pointermove', move);
-      seek.addEventListener('pointerup', function up() {
-        seek.removeEventListener('pointermove', move); seek.removeEventListener('pointerup', up);
-      });
-    });
-    seek.addEventListener('keydown', function (e) {
-      if (e.key === 'ArrowRight') { video.currentTime = Math.min(dur(), video.currentTime + 1); e.preventDefault(); }
-      if (e.key === 'ArrowLeft') { video.currentTime = Math.max(0, video.currentTime - 1); e.preventDefault(); }
-      if (e.key === ' ') { togglePlay(); e.preventDefault(); }
-    });
-
-    chapters.forEach(function (b) {
-      b.addEventListener('click', function () { video.currentTime = +b.dataset.t + 0.01; play(); });
-    });
-
-    $('#video-fullscreen').addEventListener('click', function () {
-      if (document.fullscreenElement) document.exitFullscreen();
-      else if (frame.requestFullscreen) frame.requestFullscreen();
-      else if (video.webkitEnterFullscreen) video.webkitEnterFullscreen();
-    });
-
-    // Autoplay (muted) while in view; pause when scrolled away. A manual pause sticks.
-    var userPaused = false;
-    $('#video-toggle').addEventListener('click', function () { userPaused = video.paused; });
-    if (!reduceMotion && 'IntersectionObserver' in window) {
-      new IntersectionObserver(function (entries) {
-        entries.forEach(function (en) {
-          if (en.isIntersecting && !userPaused) play();
-          else if (!en.isIntersecting) video.pause();
-        });
-      }, { threshold: 0.45 }).observe(frame);
+    function onViewerMessage(event) {
+      if (event.source !== viewer.contentWindow || event.origin !== location.origin) return;
+      if (event.data === 'cortex-teaser-ready') finish(true);
+      if (event.data === 'cortex-teaser-error') finish(false);
     }
+
+    var timeout = setTimeout(function () { finish(false); }, 45000);
+    window.addEventListener('message', onViewerMessage);
+    teaser.appendChild(viewer);
+  });
+
+  /* ---------- Geo-FlashAttention ---------- */
+  var geoDemo = $('#geoflash-demo');
+  var geoRetry = $('#geoflash-retry');
+  var geoStatus = $('#geoflash-status');
+  geoDemo.hidden = false;
+  function loadGeoflash() {
+    geoRetry.hidden = true;
+    var frame = document.createElement('iframe');
+    frame.title = 'Geo-FlashAttention on the cortex';
+    frame.src = 'static/teaser/04-geoflash/index.html';
+    frame.hidden = true;
+    geoStatus.textContent = 'Loading 3D surfaces…';
+
+    function fail() {
+      clearTimeout(timeout);
+      window.removeEventListener('message', onDemoMessage);
+      frame.remove();
+      geoRetry.hidden = false;
+      geoStatus.textContent = 'Could not load the 3D demo.';
+    }
+
+    function onDemoMessage(event) {
+      if (event.source !== frame.contentWindow || event.origin !== location.origin) return;
+      var data = event.data;
+      if (!data || data.demo !== 'geoflash') return;
+      if (data.type === 'error') {
+        fail();
+      } else if ((data.type === 'ready' || data.type === 'resize') && Number.isFinite(data.height)) {
+        frame.style.height = data.height + 'px';
+        if (data.type === 'ready') {
+          clearTimeout(timeout);
+          frame.hidden = false;
+          geoDemo.classList.add('is-ready');
+          geoStatus.textContent = '';
+        }
+      }
+    }
+
+    var timeout = setTimeout(fail, 45000);
+    window.addEventListener('message', onDemoMessage);
+    geoDemo.appendChild(frame);
+  }
+
+  geoRetry.addEventListener('click', loadGeoflash);
+  if ('IntersectionObserver' in window) {
+    var geoObserver = new IntersectionObserver(function (entries) {
+      if (!entries.some(function (entry) { return entry.isIntersecting; })) return;
+      geoObserver.disconnect();
+      loadGeoflash();
+    }, { rootMargin: '400px 0px' });
+    geoObserver.observe(geoDemo);
+  } else {
+    loadGeoflash();
   }
 
   /* ---------- figure zoom ---------- */

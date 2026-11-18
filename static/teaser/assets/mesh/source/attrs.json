@@ -1,0 +1,12 @@
+{
+  "sulc": {
+    "file": "attr/sulc.f32.bin",
+    "type": "f32",
+    "n": 136574
+  },
+  "label": {
+    "file": "attr/label.u8.bin",
+    "type": "u8",
+    "n": 136574
+  }
+}

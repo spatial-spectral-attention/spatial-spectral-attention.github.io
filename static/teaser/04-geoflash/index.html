@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Geo-FlashAttention on the cortex</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script type="importmap">{"imports":{"three":"../vendor/three/three.module.js","three/addons/":"../vendor/three/addons/"}}</script>
+<link rel="stylesheet" href="../../css/site.css">
+<style>
+  html, body { overflow: hidden; background: #fff; }
+  #stage { position: relative; aspect-ratio: 1740 / 750; overflow: hidden; background: #fff; }
+  #viz { position: absolute; transform-origin: 0 0; }
+  .brain { position: absolute; touch-action: none; cursor: grab; }
+  .brain:active { cursor: grabbing; }
+  .brain canvas { display: block; }
+  #viz svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+  #panel { padding: 0 12px 10px; text-align: center; color: #1d1f21; }
+  #caption, #hint { font: 14px/1.45 system-ui, sans-serif; margin: 4px auto 0; }
+  #hint { font-size: 12px; color: #555; }
+  #playback, #stages { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+  #playback { padding: 4px 8px; border-top: 1px solid #d6d8da; background: #f7f8fa; }
+  #stages { margin-left: auto; }
+  #playback button { font: 600 13px system-ui, sans-serif; border: 1px solid transparent; border-radius: 4px; padding: 4px 8px; min-height: 32px; color: #1d3557; background: transparent; cursor: pointer; }
+  #playback button:hover, #playback button[aria-pressed="true"] { background: #e4edf7; }
+  #playback button:focus-visible { outline: 2px solid #2f7fc1; outline-offset: -2px; }
+  #playback button:disabled { cursor: default; opacity: .5; }
+  #playback #advance { min-width: 78px; color: #fff; background: #1d3557; }
+  #playback #advance:hover { background: #294b79; }
+  @media (max-width: 600px) {
+    #stages { flex-basis: 100%; margin-left: 0; }
+    #playback button { min-height: 44px; }
+  }
+</style>
+</head><body>
+<main id="demo">
+  <div id="stage" role="img" aria-label="Two 3D cortical surfaces and the patch attention matrices">
+    <div id="viz" aria-hidden="true"></div>
+  </div>
+  <div id="panel">
+    <p id="caption" aria-live="polite">Loading cortical surfaces…</p>
+    <p id="hint">Drag either cortex to orbit both.</p>
+  </div>
+  <div id="playback" role="group" aria-label="Geo-FlashAttention playback">
+    <button id="advance" type="button" disabled>Continue</button>
+    <button id="replay" type="button" disabled>Replay stage</button>
+    <div id="stages" role="group" aria-label="Geo-FlashAttention stages">
+      <button type="button" disabled>Overview</button>
+      <button type="button" disabled>Score patches</button>
+      <button type="button" disabled>Select patches</button>
+      <button type="button" disabled>Compute attention</button>
+    </div>
+  </div>
+</main>
+<script type="module">
+const demo = document.getElementById('demo');
+const caption = document.getElementById('caption');
+function report(type) {
+  if (parent !== window) parent.postMessage({ demo: 'geoflash', type, height: demo.offsetHeight }, location.origin);
+}
+initialize().catch((error) => {
+  console.error(error);
+  caption.textContent = 'Could not load the 3D demo.';
+  report('error');
+});
+
+async function initialize() {
+// Demo from the Spatial-Spectral Coupling talk, with responsive controls for the website.
+const { loadCortex, createViewer, createMarkers, createPatchPalette, fetchNativeAttr, THREE } = await import('../lib/cortex.js');
+const motion = matchMedia('(prefers-reduced-motion: reduce)');
+
+// ---------------------------------------------------------------- constants (logical units = SVG viewBox px; F = css px per unit)
+const NS = 'http://www.w3.org/2000/svg';
+const F = 1.5, R = 2, W = 1160, H = 500, BW = 350, BS = 42, MX = 480, MY = 46;
+const TEAL = '#00b5ad', ORANGE = '#de9a33', INK = '#1d1f21';
+const TEAL_TEXT = '#007470', ORANGE_TEXT = '#8f5200';
+const PAL = ['#b07cc6', '#79cfc6', '#e3cf5e', '#ef8a7a', '#9ccc65', '#f0a64b', '#6fa8dc', '#e6a8d7'];
+const ASPECT = 840 / 532;   // brain canvas aspect (as in the 2.5D slide)
+const BH = BW / ASPECT;
+
+// ---------------------------------------------------------------- helpers (from js/geoflash.js)
+const sleep = (ms) => motion.matches ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, ms));
+const hex = (c) => [1, 3, 5].map((o) => parseInt(c.slice(o, o + 2), 16));
+const mix = (c1, c2, t) => { const [a, b] = [hex(c1), hex(c2)]; return 'rgb(' + a.map((x, i) => Math.round(x + (b[i] - x) * Math.max(0, Math.min(1, t)))).join(',') + ')'; };
+const greyFill = (v) => mix('#f3f3f3', '#2f2f2f', Math.pow(v, 0.6));
+const vFill = (v) => (v >= 0 ? mix('#fff6e8', '#de9a33', v / 0.9) : mix('#fff6e8', '#8a8f93', -v / 0.9));
+const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const [a, v] of Object.entries(attrs || {})) e.setAttribute(a, v); if (parent) parent.appendChild(e); return e; };
+const setText = (node, s) => {
+  node.textContent = '';
+  s.split(/(_\{[^}]+\}|_\w)/).forEach((part) => {
+    const t = document.createElementNS(NS, 'tspan');
+    if (part.startsWith('_')) { t.setAttribute('baseline-shift', 'sub'); t.setAttribute('font-size', '70%'); t.textContent = part.replace(/^_\{?|\}$/g, ''); }
+    else t.textContent = part;
+    node.appendChild(t);
+  });
+};
+const text = (parent, x, y, s, cls, anchor = 'middle') => { const t = el('text', { x, y, class: cls, 'text-anchor': anchor }, parent); setText(t, s); return t; };
+
+// ---------------------------------------------------------------- data
+const response = await fetch('data/geoflash.json');
+if (!response.ok) throw new Error(`Could not load geoflash.json (${response.status})`);
+const G = await response.json();
+function derive(G) {
+  const K = G.K, P = G.P, n = K * P;
+  const score = G.score.map((row) => { const m = Math.max(...row); return row.map((s) => Math.exp(s - m)); });
+  const support = score.map((row) => row.map((s, r) => [s, r]).sort((x, y) => y[0] - x[0]).slice(0, R).map((x) => x[1]).sort((a, b) => a - b));
+  const inSup = (i, j) => support[Math.floor(i / P)].includes(Math.floor(j / P));
+  const softmax = (row, mask) => { const m = Math.max(...row.filter((_, j) => mask(j))); const e = row.map((x, j) => (mask(j) ? Math.exp(x - m) : 0)); const s = e.reduce((a, b) => a + b, 0); return e.map((x) => x / s); };
+  const Ageo = G.logits.map((row, i) => softmax(row, (j) => inSup(i, j)));
+  const k = G.V[0].length;
+  const match = Array.from({ length: K }, (_, a) => {
+    const mass = Array(K).fill(0);
+    for (let i = a * P; i < a * P + P; i++) Ageo[i].forEach((p, j) => (mass[Math.floor(j / P)] += p));
+    return mass.indexOf(Math.max(...mass));
+  });
+  return { ...G, nv: n, k, scoreN: score, support, Ageo, match };
+}
+const D = derive(G);
+
+// ---------------------------------------------------------------- brains: ONE canvas / ONE scene, target stacked above source along the z axis.
+// Orbiting is azimuthal about the stack axis (polar angle limited), so both brains turn together about their own centres, and 3D arcs between patch centres are real world-space curves.
+const root = document.getElementById('viz');
+root.style.width = W * F + 'px'; root.style.height = H * F + 'px';
+const SCALE = BW / 177;                                   // logical px per mm (a brain is ~177 mm long on screen, as in the 2.5D slide)
+const ZSEP = (BH + 32) / SCALE;                           // centre-to-centre distance of the stacked brains (mm)
+const CVH = 2 * BH + 32, Y0 = 26;                         // canvas height / top in logical units
+const host = document.createElement('div'); host.className = 'brain';
+Object.assign(host.style, { left: '0px', top: Y0 * F + 'px', width: BW * F + 'px', height: CVH * F + 'px' }); root.appendChild(host);
+const Qs = new URLSearchParams(location.search);
+const viewer = createViewer(host, { camera: [430, 0, 0], fov: 14, near: 50, far: 1500,
+  controls: { enableDamping: !motion.matches, enablePan: false, minPolarAngle: Math.PI / 2 - 0.45, maxPolarAngle: Math.PI / 2 + 0.45, minDistance: 150, maxDistance: 1450 } });
+const PREF = Qs.get('level');                              // ?level=0|1|2 forces a LOD level (for close-up checks)
+
+async function makeBrain(name, key, zc, centers, smp) {
+  const c = await loadCortex(name, { levels: [0, 1, 2] });
+  if (PREF != null) c.forceLevel = +PREF;
+  const bb = c.bbox.center; c.root.position.set(-bb.x, -bb.y, zc - bb.z);
+  viewer.add(c);
+  const pal = createPatchPalette(8, { borderDark: 0.58, borderPx: 1.75 });
+  c.extend(pal.spec); pal.bind(c, await fetchNativeAttr(`data/w_${key}.u8x8.bin`, 'u8x8'));
+  // disc markers: 8 patch centres (slots 0..7) + K*P sampled vertices (slots 8..)
+  const mk = createMarkers(8 + smp.length * smp[0].length, { radiusPx: 6, strokePx: 2.5, stroke: '#1d1f21', bias: 1.5 });
+  c.root.add(mk);
+  const verts = [...centers, ...smp.flat()], pos = await Promise.all(verts.map((v) => c.nativePosition(v, 'pial'))), nrm = await Promise.all(verts.map((v) => c.nativeNormal(v, 'pial')));
+  const slot = (kind, a, j = 0) => (kind === 'c' ? a : 8 + a * smp[0].length + j);
+  const B = { name, key, c, mk, pal, pos, nrm, centers, tag: { c: [], s: [] } };
+  B.tint = (a, color, alpha) => pal.set(a, color, alpha); B.tintAll = (color, alpha) => pal.setAll(color, alpha);
+  B.setDots = (list) => {
+    mk.hideAll();
+    list.forEach(({ kind, a, r = 3.2, fill = '#fff' }) => {
+      const idx = kind === 'c' ? [a] : smp[a].map((_, j) => j);
+      idx.forEach((j) => { const i = kind === 'c' ? a : slot('s', a, j); mk.set(i, { position: pos[i], normal: nrm[i], color: fill, radius: r * 1.6 }); });
+    });
+    viewer.invalidate();
+  };
+  // screen position (logical SVG units) + visibility (0..1, fades as the vertex turns away from the camera) of a patch-centre anchor
+  const v = new THREE.Vector3(), n = new THREE.Vector3(), cp = new THREE.Vector3();
+  B.project = (a) => {
+    c.root.updateWorldMatrix(true, false); viewer.camera.updateMatrixWorld();
+    v.copy(pos[a]).applyMatrix4(c.root.matrixWorld);
+    n.copy(nrm[a]).transformDirection(c.root.matrixWorld); cp.copy(viewer.camera.position).sub(v).normalize();
+    const f = n.dot(cp), vis = Math.min(1, Math.max(0, (f + 0.05) / 0.35));
+    v.project(viewer.camera);
+    return [(v.x + 1) / 2 * BW, Y0 + (1 - v.y) / 2 * CVH, vis];
+  };
+  B.world = (a) => c.root.localToWorld(pos[a].clone());
+  return B;
+}
+const N = await makeBrain('target', 't', +ZSEP / 2, D.centers_t, D.smp_t);
+const M = await makeBrain('source', 's', -ZSEP / 2, D.centers_s, D.smp_s);
+M.y = 26 + BH + 32;                                         // top of the source brain (SVG label anchor)
+viewer.fit(new THREE.Vector3(0, 0, 0), 88.5, CVH / 2 / SCALE, 1.0);
+viewer.addTicker((dt) => { const a = N.pal.step(motion.matches ? Infinity : dt), b = M.pal.step(motion.matches ? Infinity : dt); return a || b; });
+if (Qs.get('cam')) { viewer.camera.position.set(...Qs.get('cam').split(',').map(Number)); viewer.controls.update(); }
+
+// matched-pair arcs: real 3D tubes between patch centres (static in world space; the camera orbits around them)
+const ARCS = new THREE.Group(); ARCS.visible = false; viewer.add(ARCS);
+const arcMats = [];
+function buildArcs() {
+  while (ARCS.children.length) ARCS.remove(ARCS.children[0]);
+  arcMats.length = 0;
+  for (let a = 0; a < D.K; a++) {
+    const A = N.world(a), B = M.world(D.match[a]), mid = A.clone().add(B).multiplyScalar(0.5);
+    const rad = new THREE.Vector3(mid.x, mid.y, 0); if (rad.length() < 1) rad.set(1, 0, 0); rad.normalize();
+    const tan = new THREE.Vector3(-rad.y, rad.x, 0), L = A.distanceTo(B);
+    const C = mid.clone().addScaledVector(rad, 28 + 0.18 * L).addScaledVector(tan, (a - 3.5) * 7);
+    const curve = new THREE.QuadraticBezierCurve3(A, C, B);
+    const m = new THREE.MeshBasicMaterial({ color: new THREE.Color(PAL[D.match[a]]), transparent: true, opacity: 0.0, depthWrite: false });
+    ARCS.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 48, 0.45, 6, false), m)); arcMats.push(m);
+  }
+}
+buildArcs();
+let arcT = 0, arcGoal = 0;
+viewer.addTicker((dt) => {
+  if (arcT === arcGoal) return false;
+  arcT = motion.matches ? arcGoal : arcT + Math.sign(arcGoal - arcT) * Math.min(Math.abs(arcGoal - arcT), dt / 0.6);
+  ARCS.visible = arcT > 0.001;
+  for (const m of arcMats) m.opacity = 0.85 * arcT; return true;
+});
+const showArcs = (on) => { arcGoal = on ? 1 : 0; viewer.invalidate(); };
+
+// ---------------------------------------------------------------- SVG overlay: matrix, leaders, Y, panel
+function build() {
+  const K = D.K, P = D.P, n = D.nv, C = BS / P;
+  const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, width: W * F, height: H * F }, root);
+  el('style', {}, svg).textContent = `
+    .lbl { font: 600 17px "Helvetica Neue", Arial, sans-serif; fill: ${INK}; }
+    .dim { font: 400 14px "Helvetica Neue", Arial, sans-serif; fill: #6d6d6d; }
+    .ax  { font: 600 14px "Helvetica Neue", Arial, sans-serif; fill: #626b76; transition: fill .25s; }
+    .tag { font: 700 12px "Helvetica Neue", Arial, sans-serif; letter-spacing: .08em; fill: #fff; }
+    .cx  { font: 400 16px "Helvetica Neue", Arial, sans-serif; fill: ${INK}; }
+    .cell { transition: fill .35s ease; stroke: #e2e2e2; stroke-width: 1; }
+    .fade { transition: opacity .5s ease; }
+    .lead { fill: none; stroke-width: 2.2; transition: opacity .25s; }
+    .halo { fill: none; stroke: #fff; stroke-width: 6; transition: opacity .25s; }
+    .blk  { fill: none; stroke-width: 3; transition: opacity .35s; }
+    .arc  { fill: none; stroke-width: 1.6; stroke-linecap: round; transition: opacity .6s; }
+    .mover { transition: transform .28s cubic-bezier(.4,0,.2,1), opacity .3s; }`;
+  const defs = el('defs', {}, svg);
+  const pat = el('pattern', { id: 'gf-skip', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
+  el('rect', { width: 6, height: 6, fill: '#fafafa' }, pat);
+  el('line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: '#e0e0e0', 'stroke-width': 2 }, pat);
+  const s = { svg };
+  text(svg, 0, 17, 'Target 𝒩  ·  queries, patches A_a', 'lbl', 'start').style.fill = TEAL_TEXT;
+  text(svg, 0, M.y - 10, 'Source ℳ  ·  keys / values, patches B_r', 'lbl', 'start').style.fill = ORANGE_TEXT;
+
+  const leads = el('g', {}, svg);
+  const mkLead = (color) => ({ halo: el('path', { class: 'halo', opacity: 0 }, leads), line: el('path', { class: 'lead', stroke: color, opacity: 0 }, leads) });
+  s.leadN = mkLead(TEAL); s.leadM = Array.from({ length: R }, () => mkLead(ORANGE));
+
+  s.head = text(svg, MX + (K * BS) / 2, MY - 14, '', 'lbl');
+  s.rowLbl = Array.from({ length: K }, (_, a) => text(svg, MX - 10, MY + a * BS + BS / 2 + 5, `A_${a + 1}`, 'ax', 'end'));
+  s.colLbl = Array.from({ length: K }, (_, r) => text(svg, MX + r * BS + BS / 2, MY + K * BS + 20, `B_${r + 1}`, 'ax'));
+  s.coarse = el('g', { class: 'fade' }, svg);
+  s.sc = Array.from({ length: K }, (_, a) => Array.from({ length: K }, (_, r) => el('rect', { x: MX + r * BS, y: MY + a * BS, width: BS, height: BS, class: 'cell', fill: '#fff' }, s.coarse)));
+  s.fine = el('g', { class: 'fade', opacity: 0 }, svg);
+  s.vc = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => el('rect', { x: MX + j * C, y: MY + i * C, width: C, height: C, class: 'cell', fill: '#fff' }, s.fine)));
+  s.skip = Array.from({ length: K }, (_, a) => Array.from({ length: K }, (_, r) => el('rect', { x: MX + r * BS, y: MY + a * BS, width: BS, height: BS, fill: 'url(#gf-skip)', class: 'fade', opacity: 0 }, svg)));
+  const grid = el('g', {}, svg);
+  for (let b = 1; b < K; b++) {
+    el('line', { x1: MX + b * BS, y1: MY, x2: MX + b * BS, y2: MY + K * BS, stroke: '#c9c9c9', 'stroke-width': 1.5 }, grid);
+    el('line', { x1: MX, y1: MY + b * BS, x2: MX + K * BS, y2: MY + b * BS, stroke: '#c9c9c9', 'stroke-width': 1.5 }, grid);
+  }
+  el('rect', { x: MX, y: MY, width: K * BS, height: K * BS, fill: 'none', stroke: '#9a9a9a', 'stroke-width': 1.5 }, svg);
+  s.sel = Array.from({ length: K }, (_, a) => Array.from({ length: K }, (_, r) => el('rect', { x: MX + r * BS + 1.5, y: MY + a * BS + 1.5, width: BS - 3, height: BS - 3, class: 'blk', stroke: TEAL, opacity: 0 }, svg)));
+  s.rowCur = el('rect', { x: MX - 3, y: MY, width: K * BS + 6, height: BS, fill: 'none', stroke: TEAL, 'stroke-width': 2.5, rx: 3, class: 'mover', opacity: 0 }, svg);
+  s.colCur = el('rect', { x: MX, y: MY - 3, width: BS, height: K * BS + 6, fill: 'none', stroke: ORANGE, 'stroke-width': 2.5, rx: 3, class: 'mover', opacity: 0 }, svg);
+  s.tiles = Array.from({ length: K }, () => el('rect', { x: MX, y: MY, width: BS, height: BS, fill: 'none', stroke: ORANGE, 'stroke-width': 3.5, rx: 2, class: 'mover', opacity: 0 }, svg));
+
+  const YX = MX + K * BS + 46;
+  s.yg = el('g', { class: 'fade', opacity: 0 }, svg);
+  text(s.yg, YX + (D.k * C) / 2, MY - 14, 'Y = Π Φ_M', 'lbl');
+  text(s.yg, YX + (D.k * C) / 2, MY + K * BS + 20, 'n_N × k', 'dim');
+  s.yc = Array.from({ length: n }, (_, i) => Array.from({ length: D.k }, (_, c) => el('rect', { x: YX + c * C, y: MY + i * C, width: C, height: C, class: 'cell', fill: '#fff' }, s.yg)));
+  el('rect', { x: YX, y: MY, width: D.k * C, height: n * C, fill: 'none', stroke: '#9a9a9a', 'stroke-width': 1.5 }, s.yg);
+  s.yCurs = Array.from({ length: K }, () => el('rect', { x: YX, y: MY, width: D.k * C, height: BS, fill: 'none', stroke: ORANGE, 'stroke-width': 2, 'stroke-dasharray': '4 3', rx: 2, class: 'mover', opacity: 0 }, svg));
+
+  const PX = YX + D.k * C + 34;
+  s.panel = el('g', { class: 'fade', opacity: 0 }, svg);
+  s.tagBg = el('rect', { x: PX, y: MY - 2, width: 118, height: 24, rx: 12, fill: INK }, s.panel);
+  s.tag = el('text', { x: PX + 59, y: MY + 14.5, 'text-anchor': 'middle', class: 'tag' }, s.panel);
+  s.title = el('text', { x: PX, y: MY + 58, class: 'lbl', 'font-size': 20 }, s.panel);
+  s.lines = Array.from({ length: 6 }, (_, i) => el('text', { x: PX, y: MY + 100 + i * 30, class: i % 2 ? 'cx' : 'dim' }, s.panel));
+  s.PX = PX;
+  return s;
+}
+const V = build();
+motion.addEventListener('change', () => {
+  viewer.controls.enableDamping = !motion.matches;
+  go(cur, true);
+});
+const K = D.K, P = D.P;
+
+// leaders track the 3D anchors (the camera may be orbited at any time) and fade as the anchor turns away / behind the brain
+const fs = { a: null, rs: [] };
+const rowEnd = (a) => [MX - 36, MY + a * BS + BS / 2];
+const colEnd = (r) => [MX + r * BS + BS / 2, MY + K * BS + 28];
+function leader(L, from, to, dir) {
+  const vis = from ? from[2] : 0, key = from ? `${from[0].toFixed(1)},${from[1].toFixed(1)},${vis.toFixed(2)},${to}` : '';
+  if (L.key === key) return; L.key = key;
+  if (!from || vis < 0.01) { L.halo.setAttribute('opacity', 0); L.line.setAttribute('opacity', 0); return; }
+  const [x1, y1] = from, [x2, y2] = to;
+  const d = dir === 'h' ? `M${x1},${y1} C${x1 + 90},${y1} ${x2 - 70},${y2} ${x2},${y2}` : `M${x1},${y1} C${x1 + 110},${y1} ${x2},${y2 + 70} ${x2},${y2}`;
+  L.halo.setAttribute('d', d); L.line.setAttribute('d', d); L.halo.setAttribute('opacity', vis); L.line.setAttribute('opacity', vis);
+}
+function updateOverlay() {
+  leader(V.leadN, fs.a == null ? null : N.project(fs.a), fs.a == null ? 0 : rowEnd(fs.a), 'h');
+  V.leadM.forEach((L, k) => leader(L, fs.rs[k] == null ? null : M.project(fs.rs[k]), fs.rs[k] == null ? 0 : colEnd(fs.rs[k]), 'v'));
+}
+viewer.addTicker(() => { updateOverlay(); return false; });
+viewer.controls.addEventListener('change', updateOverlay);
+
+function focus(a, rs) {
+  fs.a = a; fs.rs = rs;
+  V.rowLbl.forEach((t, i) => (t.style.fill = i === a ? TEAL_TEXT : ''));
+  V.colLbl.forEach((t, i) => (t.style.fill = rs.includes(i) ? ORANGE_TEXT : ''));
+}
+const panel = (tag, tagColor, title, lines, tagW = 118) => {
+  V.panel.setAttribute('opacity', 1); V.tag.textContent = tag; V.tagBg.setAttribute('fill', tagColor);
+  V.tagBg.setAttribute('width', tagW); V.tag.setAttribute('x', V.PX + tagW / 2); V.title.textContent = title;
+  V.lines.forEach((t, i) => setText(t, lines[i] || ''));
+};
+const paintScores = (cols) => V.sc.forEach((row, a) => row.forEach((c, r) => c.setAttribute('fill', r < cols ? greyFill(D.scoreN[a][r]) : '#fff')));
+const lightRows = (on) => V.rowLbl.forEach((t) => (t.style.fill = on ? TEAL_TEXT : ''));
+const showSupport = (on, a = null) => V.sel.forEach((row, aa) => row.forEach((c, r) => c.setAttribute('opacity', on && (a == null || a >= aa) && D.support[aa].includes(r) ? 1 : 0)));
+const showSkip = (on, a = null) => V.skip.forEach((row, aa) => row.forEach((c, r) => c.setAttribute('opacity', on && (a == null || a >= aa) && !D.support[aa].includes(r) ? 1 : 0)));
+const moveTo = (node, x, y) => { node.style.transform = `translate(${x}px, ${y}px)`; node.setAttribute('opacity', 1); };
+const hide = (...nodes) => nodes.forEach((x) => x.setAttribute('opacity', 0));
+const dotsFor = (patches, style) => patches.map((a) => ({ kind: 's', a, ...style }));
+
+function reset() {
+  hide(V.rowCur, V.colCur, ...V.tiles, ...V.yCurs, V.yg, V.panel);
+  showArcs(false); focus(null, []);
+  V.coarse.setAttribute('opacity', 1); V.fine.setAttribute('opacity', 0);
+  paintScores(0); showSupport(false); showSkip(false);
+  V.vc.flat().forEach((c) => c.setAttribute('fill', '#fff')); V.yc.flat().forEach((c) => c.setAttribute('fill', '#fff'));
+  N.setDots([]); M.setDots([]);
+}
+
+// ---------------------------------------------------------------- steps
+let runToken = 0;
+async function show(step) {
+  const token = ++runToken, live = () => token === runToken;
+  reset();
+  if (step === 0) { V.head.textContent = ''; N.tintAll(TEAL, 0.16); M.tintAll(ORANGE, 0.16); return; }
+  if (step === 1) {
+    setText(V.head, 'Patch scores s_{ar}');
+    panel('COARSE', INK, 'Score patch pairs', ['score', 's_{ar} = max_{i∈Aₐ} q_iᵀ μ_r', 'mean key of B_r', 'μ_r = mean_{j∈Bᵣ} k_j', 'time', 'O(n_N · |ℬ| · d)']);
+    const mu = Array.from({ length: K }, (_, a) => ({ kind: 'c', a, r: 3.6, fill: INK }));
+    paintScores(0); N.tintAll(TEAL, 0.4);
+    for (let r = 0; r < K && live(); r++) {
+      M.tintAll(ORANGE, 0.1); M.tint(r, ORANGE, 0.85);
+      M.setDots(mu.map((d, i) => (i === r ? { ...d, r: 5.2, fill: ORANGE } : d)));
+      moveTo(V.colCur, r * BS, 0); focus(null, [r]); lightRows(true); paintScores(r + 1);
+      await sleep(650);
+    }
+    if (!live()) return;
+    hide(V.colCur); focus(null, []);
+    N.tintAll(TEAL, 0.16); M.tintAll(ORANGE, 0.16); M.setDots(mu);
+    return;
+  }
+  if (step === 2) {
+    setText(V.head, `Top-${R} source patches per row`);
+    paintScores(K);
+    panel('SUPPORT', TEAL_TEXT, `Keep top-${R} per patch`, ['budget', `R = ${R} of ${K} source patches`, 'why it works', 'attention mass is block-sparse', 'selection is cheap', 'no vertex pair evaluated yet']);
+    const cs = (list) => list.map((a) => ({ kind: 'c', a, r: 4.2, fill: ORANGE }));
+    for (let a = 0; a < K && live(); a++) {
+      N.tintAll(TEAL, 0.1); N.tint(a, TEAL, 0.85);
+      M.tintAll(ORANGE, 0.08); D.support[a].forEach((r) => M.tint(r, ORANGE, 0.85));
+      N.setDots([{ kind: 'c', a, r: 4.2, fill: TEAL }]); M.setDots(cs(D.support[a]));
+      moveTo(V.rowCur, 0, a * BS); focus(a, D.support[a]);
+      showSupport(true, a); showSkip(true, a);
+      await sleep(900);
+    }
+    return;
+  }
+  if (step === 3) {
+    setText(V.head, 'Exact softmax on the support');
+    showSupport(true); showSkip(true);
+    V.coarse.setAttribute('opacity', 0); V.fine.setAttribute('opacity', 1); V.yg.setAttribute('opacity', 1);
+    panel('EXACT ON SUPPORT', TEAL_TEXT, 'Geo-FlashAttention', ['time', 'O(n_N · R · m_{max} · (d + k))', 'memory', 'O(n_N + R · m_{max})', 'tiles', `${K * R} of ${K * K} patch pairs`], 172);
+    for (let r = 0; r < K; r++) M.tint(r, PAL[r], 0.38);
+    N.tintAll('#ffffff', 0); N.setDots([]); M.setDots([]);
+    await sleep(700);
+    if (!live()) return;
+    const acc = Array.from({ length: D.nv }, () => ({ m: -Infinity, l: 0, o: Array(D.k).fill(0) }));
+    N.tintAll(TEAL, 0.8);
+    V.yCurs.forEach((y, a) => moveTo(y, 0, a * BS));
+    lightRows(true);
+    for (let t = 0; t < R && live(); t++) {
+      const active = D.support.map((sup) => sup[t]);
+      const used = [...new Set(active)];
+      V.colLbl.forEach((x, r) => (x.style.fill = used.includes(r) ? ORANGE_TEXT : ''));
+      for (let rr = 0; rr < K; rr++) M.tint(rr, PAL[rr], used.includes(rr) ? 0.95 : 0.22);
+      M.setDots(dotsFor(used, { r: 3.2, fill: '#fff' }));
+      for (let a = 0; a < K; a++) {
+        const r = active[a];
+        moveTo(V.tiles[a], r * BS, a * BS);
+        for (let i = a * P; i < a * P + P; i++) {
+          const rowMax = Math.max(...D.Ageo[i]);
+          for (let j = r * P; j < r * P + P; j++) V.vc[i][j].setAttribute('fill', greyFill(D.Ageo[i][j] / rowMax));
+          const st = acc[i], blk = D.logits[i].slice(r * P, r * P + P);
+          const mNew = Math.max(st.m, ...blk), sc = Math.exp(st.m - mNew);
+          st.l *= sc; st.o = st.o.map((x) => x * sc);
+          blk.forEach((x, tt) => { const p = Math.exp(x - mNew); st.l += p; st.o = st.o.map((o, c) => o + p * D.V[r * P + tt][c]); });
+          st.m = mNew;
+          st.o.forEach((o, c) => V.yc[i][c].setAttribute('fill', vFill(o / st.l)));
+        }
+      }
+      await sleep(1400);
+    }
+    if (!live()) return;
+    for (let a = 0; a < K; a++) N.tint(a, PAL[D.match[a]], 0.75);
+    hide(...V.tiles, ...V.yCurs); focus(null, []); N.setDots([]); M.setDots([]);
+    for (let r = 0; r < K; r++) M.tint(r, PAL[r], 0.75);
+    // matched pairs: 3D arcs between patch centres (world-space tubes)
+    showArcs(true);
+    N.setDots(D.match.map((m, a) => ({ kind: 'c', a, r: 3, fill: PAL[m] }))); M.setDots(Array.from({ length: K }, (_, r) => ({ kind: 'c', a: r, r: 3, fill: PAL[r] })));
+  }
+}
+
+// ---------------------------------------------------------------- responsive stage and controls
+const captions = [
+  'Illustrative example with eight patches per cortex and three sampled vertices per patch.',
+  'For each target patch, score each source patch using its mean key and the best query.',
+  'For each target patch, keep the two highest-scoring source patches.',
+  'Stream the selected pairs and compute exact softmax over their vertices.'
+];
+const buttons = [...document.querySelectorAll('#stages button')];
+const advance = document.getElementById('advance');
+const replay = document.getElementById('replay');
+let cur = -1;
+
+function go(step, restart = false) {
+  if (!Number.isInteger(step) || step < 0 || step >= buttons.length || (step === cur && !restart)) return;
+  cur = step;
+  buttons.forEach((button, i) => button.setAttribute('aria-pressed', String(i === cur)));
+  caption.textContent = captions[cur];
+  advance.textContent = cur === buttons.length - 1 ? 'Restart' : 'Continue';
+  replay.disabled = cur === 0 || motion.matches;
+  show(cur);
+}
+
+buttons.forEach((button, i) => {
+  button.disabled = false;
+  button.addEventListener('click', () => go(i));
+});
+advance.disabled = false;
+advance.addEventListener('click', () => go((cur + 1) % buttons.length));
+replay.addEventListener('click', () => go(cur, true));
+document.getElementById('stages').addEventListener('keydown', (event) => {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+  const next = cur + (event.key === 'ArrowLeft' ? -1 : 1);
+  if (!buttons[next]) return;
+  event.preventDefault();
+  go(next);
+  buttons[next].focus();
+});
+window.demo = { step: go, get current() { return cur; } };
+
+const stage = document.getElementById('stage');
+function fit() {
+  root.style.transform = `scale(${stage.clientWidth / (W * F)})`;
+}
+new ResizeObserver(() => {
+  fit();
+  report('resize');
+}).observe(demo);
+fit();
+const initial = Number(Qs.get('step'));
+go(buttons[initial] ? initial : 0);
+report('ready');
+}
+</script></body></html>

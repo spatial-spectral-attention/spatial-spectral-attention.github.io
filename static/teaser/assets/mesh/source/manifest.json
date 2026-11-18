@@ -1,0 +1,47 @@
+{
+  "name": "source",
+  "version": 1,
+  "nNative": 136574,
+  "nativeTris": 273144,
+  "surfaces": [
+    "pial"
+  ],
+  "levels": [
+    {
+      "level": 0,
+      "tris": 20000,
+      "verts": 10002,
+      "indexType": "u16",
+      "error": 0.003164016641676426,
+      "pos": {
+        "pial": "L0.pial.bin"
+      },
+      "indices": "L0.idx.bin",
+      "nat": "L0.nat.bin"
+    },
+    {
+      "level": 1,
+      "tris": 79988,
+      "verts": 39996,
+      "indexType": "u16",
+      "error": 0.001006616628728807,
+      "pos": {
+        "pial": "L1.pial.bin"
+      },
+      "indices": "L1.idx.bin",
+      "nat": "L1.nat.bin"
+    },
+    {
+      "level": 2,
+      "tris": 273144,
+      "verts": 136574,
+      "indexType": "u32",
+      "error": 0,
+      "pos": {
+        "pial": "L2.pial.bin"
+      },
+      "indices": "L2.idx.bin",
+      "nat": null
+    }
+  ]
+}

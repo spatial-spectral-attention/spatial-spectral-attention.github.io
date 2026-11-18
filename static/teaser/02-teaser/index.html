@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Interactive cortical correspondence</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script type="importmap">{"imports":{"three":"../vendor/three/three.module.js","three/addons/":"../vendor/three/addons/"}}</script>
+<style>
+  :root{--ink:#1d1f21;--grey:#6d6d6d;--blue:#2f7fc1;--green:#00b050;--teal:#00b5ad;--orange:#de9a33}
+  html,body{margin:0;height:100%;background:#fff;overflow:hidden;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;color:var(--ink)}
+  #stage{position:absolute;inset:0 0 40px;overflow:hidden;--u:1px}
+  #view{position:absolute;inset:0}
+  #view canvas{cursor:grab}
+  #view canvas:active{cursor:grabbing}
+  #explore-hint{position:absolute;top:10px;left:10px;max-width:calc(100% - 20px);box-sizing:border-box;padding:5px 9px;border-radius:6px;background:#f0f5fb;color:#1d3557;font:500 12px/1.35 system-ui,sans-serif;pointer-events:none}
+  .ov{position:absolute;pointer-events:none;opacity:0;white-space:nowrap}
+  #cap1{left:calc(70*var(--u));bottom:calc(52*var(--u));font-size:calc(30*var(--u))}
+  #cap1 b{font-weight:700} #cap1 span{color:var(--grey);margin-left:.6em}
+  #counter{left:calc(42*var(--u));bottom:calc(40*var(--u));padding:calc(18*var(--u)) calc(30*var(--u)) calc(16*var(--u));
+    background:rgba(255,255,255,.86);border-radius:calc(14*var(--u));box-shadow:0 calc(2*var(--u)) calc(16*var(--u)) rgba(0,0,0,.08)}
+  #counter .n{font-size:calc(76*var(--u));font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+  #counter .n small{font-size:calc(34*var(--u));font-weight:400;color:var(--grey);margin-left:.35em}
+  #counter .t{font-size:calc(27*var(--u));color:var(--grey);margin-top:calc(8*var(--u))}
+  .shape{text-align:center;transform:translate(-50%,-100%)}
+  .shape b{display:block;font-size:calc(40*var(--u));line-height:1.1}
+  .shape span{font-size:calc(28*var(--u));color:var(--grey)}
+  .shape sub{font-size:.68em;vertical-align:baseline;position:relative;top:.28em}
+  #shM b{color:var(--blue)} #shN b{color:var(--green)}
+  .bot{left:0;right:0;text-align:center;bottom:calc(52*var(--u));font-size:calc(34*var(--u))}
+  .bot sup{font-size:.62em}
+  #foot{right:calc(60*var(--u));bottom:calc(24*var(--u));font-size:calc(23*var(--u));color:var(--grey)}
+  #hint{left:calc(70*var(--u));top:calc(48*var(--u));font-size:calc(26*var(--u));color:var(--grey)}
+  #hint i{display:inline-block;width:calc(14*var(--u));height:calc(14*var(--u));border-radius:50%;background:var(--orange);margin-right:.5em}
+  #tip{position:absolute;pointer-events:none;opacity:0;font-size:calc(24*var(--u));background:rgba(255,255,255,.92);
+    padding:calc(6*var(--u)) calc(12*var(--u));border-radius:calc(8*var(--u));box-shadow:0 1px 8px rgba(0,0,0,.15);white-space:nowrap;transform:translate(14px,-120%)}
+  #tip b{color:var(--orange)}
+  #playback{position:absolute;inset:auto 0 0;box-sizing:border-box;height:40px;display:flex;align-items:center;justify-content:space-between;gap:4px;padding:0 8px;border-top:1px solid #d6d8da;background:#f7f8fa}
+  #playback[hidden]{display:none}
+  #chapters{display:flex;gap:2px;margin-left:auto}
+  #playback button{font:600 13px system-ui,sans-serif;border:1px solid transparent;border-radius:4px;padding:4px 6px;min-height:30px;color:#1d3557;background:transparent;cursor:pointer}
+  #playback button:hover,#playback button[aria-current="step"]{background:#e4edf7}
+  #playback #play{min-width:78px;color:#fff;background:#1d3557}
+  #playback #play:hover{background:#294b79}
+  #playback #play.continue-prompt{background:#245a87}
+  @media (prefers-reduced-motion: no-preference) {
+    #playback #play.continue-prompt{animation:continue-pulse 1.1s ease-out 2}
+    @keyframes continue-pulse {
+      0%{box-shadow:0 0 0 0 rgba(47,127,193,.5)}
+      100%{box-shadow:0 0 0 5px rgba(47,127,193,0)}
+    }
+  }
+  #playback button:focus-visible{outline:2px solid #2f7fc1;outline-offset:-2px}
+  #dbg{position:absolute;left:8px;top:8px;font:12px monospace;color:#555;display:none}
+</style></head><body>
+<div id="stage">
+  <div id="view"></div>
+  <div id="explore-hint" hidden>Drag to rotate. Scroll over the brain or pinch to zoom.</div>
+  <div class="ov shape" id="shM"><b>Shape M</b><span>n<sub>M</sub> = <span id="nM">136,574</span> vertices</span></div>
+  <div class="ov shape" id="shN"><b>Shape N</b><span>n<sub>N</sub> = <span id="nN">153,037</span> vertices</span></div>
+  <div class="ov" id="cap1"><b>Cortical surface</b><span>MMRR-21-15 · right hemisphere · Mindboggle-101</span></div>
+  <div class="ov" id="counter"><div class="n"><span id="cnt">0</span><small>vertices</small></div><div class="t"><span id="tris">273,144</span> triangles · one hemisphere</div></div>
+  <div class="ov bot" id="cap2"><b>Dense point-to-point map &Pi;:</b>&nbsp; 136k &times; 153k &approx; 2.1 &times; 10<sup>10</sup>&nbsp; vertex pairs</div>
+  <div class="ov bot" id="cap3"><b>The estimated correspondences allow transfer of signals </b></div>
+  <div class="ov" id="foot">examples: fMRI activity, cortical thickness, or regional segmentations</div>
+  <div class="ov" id="hint"><i></i>Hover the green cortex to see where each point comes from</div>
+  <div id="tip"></div>
+  <div id="dbg"></div>
+</div>
+<div id="playback" role="group" aria-label="Teaser playback" hidden>
+  <button id="play" type="button"></button>
+  <div id="chapters" role="group" aria-label="Teaser chapters"></div>
+</div>
+<p id="load-error" hidden>Could not load the interactive teaser.</p>
+<script type="module">
+  import('./teaser.js').then(() => {
+    window.parent.postMessage('cortex-teaser-ready', location.origin);
+  }).catch((error) => {
+    console.error(error);
+    document.getElementById('stage').hidden = true;
+    document.getElementById('load-error').hidden = false;
+    window.parent.postMessage('cortex-teaser-error', location.origin);
+  });
+</script>
+</body></html>
