@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="../../css/site.css">
 <style>
   html, body { overflow: hidden; background: #fff; }
-  #stage { position: relative; aspect-ratio: 1740 / 750; overflow: hidden; background: #fff; }
+  #stage { position: relative; aspect-ratio: 1240 / 560; overflow: hidden; background: #fff; }
   #viz { position: absolute; transform-origin: 0 0; }
   .brain { position: absolute; touch-action: none; cursor: grab; }
   .brain:active { cursor: grabbing; }
@@ -67,7 +67,8 @@ const motion = matchMedia('(prefers-reduced-motion: reduce)');
 
 // ---------------------------------------------------------------- constants (logical units = SVG viewBox px; F = css px per unit)
 const NS = 'http://www.w3.org/2000/svg';
-const F = 1.5, R = 2, W = 1160, H = 500, BW = 350, BS = 42, MX = 480, MY = 46;
+const F = 1.5, R = 2, W = 1240, H = 560, BW = 350, BS = 42, MX = 480, MY = 46;
+const INSET_X = 24, INSET_Y = 12;
 const TEAL = '#00b5ad', ORANGE = '#de9a33', INK = '#1d1f21';
 const TEAL_TEXT = '#007470', ORANGE_TEXT = '#8f5200';
 const PAL = ['#b07cc6', '#79cfc6', '#e3cf5e', '#ef8a7a', '#9ccc65', '#f0a64b', '#6fa8dc', '#e6a8d7'];
@@ -118,10 +119,12 @@ const D = derive(G);
 const root = document.getElementById('viz');
 root.style.width = W * F + 'px'; root.style.height = H * F + 'px';
 const SCALE = BW / 177;                                   // logical px per mm (a brain is ~177 mm long on screen, as in the 2.5D slide)
-const ZSEP = (BH + 32) / SCALE;                           // centre-to-centre distance of the stacked brains (mm)
-const CVH = 2 * BH + 32, Y0 = 26;                         // canvas height / top in logical units
+const BRAIN_GAP = 116;
+const ZSEP = (BH + BRAIN_GAP) / SCALE;                     // centre-to-centre distance of the stacked brains (mm)
+const CVH = 2 * BH + BRAIN_GAP, Y0 = -INSET_Y;             // canvas height / top in logical units
+const SOURCE_LABEL_Y = Y0 + BH + BRAIN_GAP / 2 + 5;        // label baseline in the gap
 const host = document.createElement('div'); host.className = 'brain';
-Object.assign(host.style, { left: '0px', top: Y0 * F + 'px', width: BW * F + 'px', height: CVH * F + 'px' }); root.appendChild(host);
+Object.assign(host.style, { left: INSET_X * F + 'px', top: (Y0 + INSET_Y) * F + 'px', width: BW * F + 'px', height: CVH * F + 'px' }); root.appendChild(host);
 const Qs = new URLSearchParams(location.search);
 const viewer = createViewer(host, { camera: [430, 0, 0], fov: 14, near: 50, far: 1500,
   controls: { enableDamping: !motion.matches, enablePan: false, minPolarAngle: Math.PI / 2 - 0.45, maxPolarAngle: Math.PI / 2 + 0.45, minDistance: 150, maxDistance: 1450 } });
@@ -164,7 +167,6 @@ async function makeBrain(name, key, zc, centers, smp) {
 }
 const N = await makeBrain('target', 't', +ZSEP / 2, D.centers_t, D.smp_t);
 const M = await makeBrain('source', 's', -ZSEP / 2, D.centers_s, D.smp_s);
-M.y = 26 + BH + 32;                                         // top of the source brain (SVG label anchor)
 viewer.fit(new THREE.Vector3(0, 0, 0), 88.5, CVH / 2 / SCALE, 1.0);
 viewer.addTicker((dt) => { const a = N.pal.step(motion.matches ? Infinity : dt), b = M.pal.step(motion.matches ? Infinity : dt); return a || b; });
 if (Qs.get('cam')) { viewer.camera.position.set(...Qs.get('cam').split(',').map(Number)); viewer.controls.update(); }
@@ -198,7 +200,7 @@ const showArcs = (on) => { arcGoal = on ? 1 : 0; viewer.invalidate(); };
 // ---------------------------------------------------------------- SVG overlay: matrix, leaders, Y, panel
 function build() {
   const K = D.K, P = D.P, n = D.nv, C = BS / P;
-  const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, width: W * F, height: H * F }, root);
+  const svg = el('svg', { viewBox: `${-INSET_X} ${-INSET_Y} ${W} ${H}`, width: W * F, height: H * F }, root);
   el('style', {}, svg).textContent = `
     .lbl { font: 600 17px "Helvetica Neue", Arial, sans-serif; fill: ${INK}; }
     .dim { font: 400 14px "Helvetica Neue", Arial, sans-serif; fill: #6d6d6d; }
@@ -218,7 +220,7 @@ function build() {
   el('line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: '#e0e0e0', 'stroke-width': 2 }, pat);
   const s = { svg };
   text(svg, 0, 17, 'Target 𝒩  ·  queries, patches A_a', 'lbl', 'start').style.fill = TEAL_TEXT;
-  text(svg, 0, M.y - 10, 'Source ℳ  ·  keys / values, patches B_r', 'lbl', 'start').style.fill = ORANGE_TEXT;
+  text(svg, 0, SOURCE_LABEL_Y, 'Source ℳ  ·  keys / values, patches B_r', 'lbl', 'start').style.fill = ORANGE_TEXT;
 
   const leads = el('g', {}, svg);
   const mkLead = (color) => ({ halo: el('path', { class: 'halo', opacity: 0 }, leads), line: el('path', { class: 'lead', stroke: color, opacity: 0 }, leads) });
