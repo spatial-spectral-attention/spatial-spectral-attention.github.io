@@ -52,27 +52,31 @@
         </h1>
 
         <div class="paper-details">
+          <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+            <symbol id="equal-mark" viewBox="0 0 16 16"><path d="M3 5.5h10M3 10.5h10"/></symbol>
+            <symbol id="mail-mark" viewBox="0 0 16 16"><rect x="1.5" y="3" width="13" height="10" rx="1.5"/><path d="m2 4 6 4.5L14 4"/></symbol>
+          </svg>
           <div class="authors">
             <div class="author-row">
               <div class="author">
                 <img class="author-portrait" src="static/images/people/demeter.webp" alt="" width="80" height="80">
-                <span>Bence Demeter<sup>1*</sup></span>
+                <span>Bence Demeter<sup>1<svg class="role-mark" role="img" aria-label="Equal contribution"><use href="#equal-mark"/></svg></sup></span>
               </div>
               <div class="author">
                 <img class="author-portrait" src="static/images/people/ehrenreich.webp" alt="" width="80" height="80">
-                <span>Kilian Ehrenreich<sup>1*</sup></span>
+                <span>Kilian Ehrenreich<sup>1<svg class="role-mark" role="img" aria-label="Equal contribution"><use href="#equal-mark"/></svg></sup></span>
               </div>
               <div class="author">
                 <img class="author-portrait" src="static/images/people/kleber.webp" alt="" width="80" height="80">
-                <span>Amelie Kleber<sup>1*</sup></span>
+                <span>Amelie Kleber<sup>1<svg class="role-mark" role="img" aria-label="Equal contribution"><use href="#equal-mark"/></svg></sup></span>
               </div>
               <div class="author">
                 <img class="author-portrait" src="static/images/people/oprisiu.webp" alt="" width="80" height="80">
-                <span>Ioana Oprisiu<sup>1*</sup></span>
+                <span>Ioana Oprisiu<sup>1<svg class="role-mark" role="img" aria-label="Equal contribution"><use href="#equal-mark"/></svg></sup></span>
               </div>
               <div class="author">
                 <img class="author-portrait" src="static/images/people/spohn.webp" alt="" width="80" height="80">
-                <span>Philipp Spohn<sup>1*</sup></span>
+                <span>Philipp Spohn<sup>1<svg class="role-mark" role="img" aria-label="Equal contribution"><use href="#equal-mark"/></svg></sup></span>
               </div>
             </div>
             <div class="author-row">
@@ -86,11 +90,14 @@
               </div>
               <div class="author">
                 <img class="author-portrait" src="static/images/people/bastian.webp" alt="" width="80" height="80">
-                <span>Lennart Bastian<sup>3†</sup></span>
+                <span>Lennart Bastian<sup>3<svg class="role-mark" role="img" aria-label="Corresponding author"><use href="#mail-mark"/></svg></sup></span>
               </div>
             </div>
           </div>
-          <p class="author-note">* Equal contribution, ordered alphabetically. † Correspondence: l.bastian@imperial.ac.uk</p>
+          <div class="author-notes">
+            <p><svg class="role-mark" aria-hidden="true"><use href="#equal-mark"/></svg> <strong>Equal contribution</strong> <span>Authors listed alphabetically</span></p>
+            <p><svg class="role-mark" aria-hidden="true"><use href="#mail-mark"/></svg> <strong>Correspondence to</strong> <a href="mailto:l.bastian@imperial.ac.uk">l.bastian@imperial.ac.uk</a></p>
+          </div>
           <p class="affiliations">
             <span><sup>1</sup> Technical University of Munich</span>
             <span><sup>2</sup> Munich Center for Machine Learning</span>
